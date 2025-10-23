@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Triangle Height & Target Calculator</title>
+  <style>
+    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial; background:#0f1720; color:#e6eef8; display:flex; align-items:center; justify-content:center; min-height:100vh;}
+    .card{background:#0b1220; border:1px solid #1f2937; padding:20px; width:520px; border-radius:12px; box-shadow:0 8px 30px rgba(2,6,23,.6)}
+    h1{font-size:18px;margin:0 0 12px}
+    label{display:block;margin-top:10px;font-size:13px;color:#cfe3ff}
+    input, select{width:100%;padding:10px;border-radius:8px;border:1px solid #233044;background:#07101a;color:#dff0ff;font-size:14px;margin-top:6px}
+    .row{display:flex;gap:10px}
+    .half{flex:1}
+    button{margin-top:14px;padding:10px 12px;border-radius:8px;border:none;background:#06b6d4;color:#022;cursor:pointer;font-weight:600}
+    .out{margin-top:14px;background:#071827;border-radius:8px;padding:12px;border:1px solid #1b3240}
+    .muted{color:#7f9db3;font-size:13px}
+    .small{font-size:13px}
+    .copy{background:#334155;color:#e6f6ff;border-radius:6px;padding:6px 8px;border:none;margin-left:8px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Triangle Height & Target Calculator</h1>
+    <div class="muted small">Fill top and bottom of the triangle. Enter breakout price if known (optional).</div>
+
+    <label>Top of triangle (Top price)</label>
+    <input id="top" type="number" step="0.01" placeholder="e.g. 4350" value="4350">
+
+    <label>Bottom of triangle (Bottom price)</label>
+    <input id="bottom" type="number" step="0.01" placeholder="e.g. 3700" value="3700">
+
+    <div class="row">
+      <div class="half">
+        <label>Breakout Price (optional)</label>
+        <input id="breakout" type="number" step="0.01" placeholder="e.g. 3950">
+      </div>
+      <div class="half">
+        <label>Breakout Direction</label>
+        <select id="direction">
+          <option value="auto">Auto (use breakout price to decide)</option>
+          <option value="up">Upside</option>
+          <option value="down">Downside</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="calc">Calculate</button>
+
+    <div class="out" id="output" style="display:none">
+      <div class="small muted">Height (Top - Bottom):</div>
+      <div id="height" style="font-weight:700;font-size:15px;margin-top:6px">-</div>
+
+      <div style="margin-top:10px" class="small muted">Breakout used:</div>
+      <div id="usedBreakout">-</div>
+
+      <div style="margin-top:10px" class="small muted">Targets:</div>
+      <div id="targets" style="font-weight:700"></div>
+
+      <div style="margin-top:12px" class="muted small">Notes:</div>
+      <ul id="notes" class="small"></ul>
+
+      <div style="margin-top:10px">
+        <button id="copyResult" class="copy">Copy results</button>
+        <button id="reset" class="copy">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function fmt(n){ if(isNaN(n)) return '-'; return Number(n).toLocaleString(undefined,{maximumFractionDigits:2}) }
+    document.getElementById('calc').addEventListener('click',()=>{
+      const top = parseFloat(document.getElementById('top').value);
+      const bottom = parseFloat(document.getElementById('bottom').value);
+      const breakoutInput = document.getElementById('breakout').value;
+      const breakout = breakoutInput === '' ? null : parseFloat(breakoutInput);
+      const dir = document.getElementById('direction').value;
+
+      if(isNaN(top) || isNaN(bottom)){
+        alert('Top and Bottom must be valid numbers'); return;
+      }
+      if(top <= bottom){ if(!confirm('Top is less than or equal to Bottom. Continue?')) return; }
+
+      const height = Math.abs(top - bottom);
+      const out = document.getElementById('output'); out.style.display='block';
+      document.getElementById('height').textContent = fmt(height);
+
+      let used = 'Not provided (will use breakout price if available)';
+      let targetsText = '';
+      const notes = [];
+
+      let chosenDir = dir;
+      if(dir === 'auto'){
+        if(breakout !== null){ chosenDir = breakout >= top ? 'up' : breakout <= bottom ? 'down' : (breakout > (top+bottom)/2 ? 'up' : 'down'); }
+        else chosenDir = 'up or down (provide breakout to choose)';
+      }
+
+      if(breakout !== null){
+        used = fmt(breakout);
+        if(chosenDir === 'up'){
+          const target = breakout + height;
+          targetsText = `Upside target = ${fmt(target)} (breakout ${fmt(breakout)} + height ${fmt(height)})`;
+        } else if(chosenDir === 'down'){
+          const target = breakout - height;
+          targetsText = `Downside target = ${fmt(target)} (breakout ${fmt(breakout)} - height ${fmt(height)})`;
+        }
+      } else {
+        // show both possibilities using top and bottom as approximate breakout points
+        const upTarget = top + height;
+        const downTarget = bottom - height;
+        targetsText = `If upside breakout at ~${fmt(top)} → target ≈ ${fmt(upTarget)}\nIf downside breakdown at ~${fmt(bottom)} → target ≈ ${fmt(downTarget)}`;
+      }
+
+      if(breakout !== null && breakout > top && breakout < top + height*0.15) notes.push('Breakout is only slightly above top — watch for false breakout / wick.');
+      if(breakout !== null && breakout < bottom && breakout > bottom - height*0.15) notes.push('Breakdown is only slightly below bottom — watch for false breakdown.');
+      if(breakout === null) notes.push('No breakout price provided — targets shown are projections based on top/bottom as breakout.');
+      notes.push('Use candle close confirmation and volume to confirm breakout.');
+
+      document.getElementById('usedBreakout').textContent = used;
+      document.getElementById('targets').textContent = targetsText;
+      const notesEl = document.getElementById('notes'); notesEl.innerHTML = '';
+      notes.forEach(n=>{ const li = document.createElement('li'); li.textContent = n; notesEl.appendChild(li); });
+
+    });
+
+    document.getElementById('copyResult').addEventListener('click',()=>{
+      const h = document.getElementById('height').textContent;
+      const used = document.getElementById('usedBreakout').textContent;
+      const t = document.getElementById('targets').textContent;
+      const text = `Height: ${h}\nBreakout: ${used}\nTargets:\n${t}`;
+      navigator.clipboard.writeText(text).then(()=>{ alert('Copied to clipboard') }).catch(()=>{ alert('Copy failed') });
+    });
+    document.getElementById('reset').addEventListener('click',()=>{ document.getElementById('top').value=''; document.getElementById('bottom').value=''; document.getElementById('breakout').value=''; document.getElementById('direction').value='auto'; document.getElementById('output').style.display='none'; });
+  </script>
+</body>
+</html>
